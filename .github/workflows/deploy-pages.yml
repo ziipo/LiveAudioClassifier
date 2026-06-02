@@ -1,0 +1,46 @@
+name: Deploy web demo to GitHub Pages
+
+# Publish web/ to GitHub Pages whenever main moves. Uses Actions' first-party
+# Pages deployment (no gh-pages branch needed). The workflow is intentionally
+# minimal — no build step because the demo is plain HTML/CSS/JS that runs
+# directly from the source tree.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Run one deploy at a time; cancel queued ones if a new commit lands.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload web/ as the Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

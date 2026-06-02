@@ -1,0 +1,12 @@
+# Minimum dependencies for the local CLI (scripts/predict.py).
+# Pip will resolve transitive dependencies automatically.
+#
+# Total install size is large because of torch (~700 MB) — that's the cost of
+# running an 86M-parameter transformer locally. The browser demo at
+# https://ziipo.github.io/LiveAudioClassifier/ avoids this if you don't want
+# to install anything.
+
+torch>=2.1
+transformers>=4.40
+librosa>=0.10
+numpy>=1.24

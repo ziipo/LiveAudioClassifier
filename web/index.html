@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Audio Classifier — is it live or studio?</title>
+  <meta name="description" content="Drop an audio file. A neural network running entirely in your browser tells you whether it's a live or studio recording. No audio leaves your device." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🎙%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Live or Studio?</h1>
+      <p class="tagline">
+        Drop an audio file. A neural network running entirely in your browser will tell you
+        whether it sounds like a <em>live performance</em> or a <em>studio recording</em>.
+      </p>
+      <p class="hint">
+        <span id="acceleratorHint">Detecting accelerator…</span><br />
+        <span id="metricsHint">Loading probe…</span>
+      </p>
+    </header>
+
+    <section
+      id="dropzone"
+      tabindex="0"
+      role="button"
+      aria-label="Upload an audio file. Click or drop a file."
+    >
+      <div class="dropzone-inner">
+        <div class="dropzone-icon" aria-hidden="true">🎵</div>
+        <div class="dropzone-text">
+          <strong>Drop an audio file here</strong>
+          <span>or click to choose · MP3, WAV, FLAC, M4A…</span>
+        </div>
+      </div>
+      <input
+        id="fileInput"
+        type="file"
+        accept="audio/*"
+        style="display:none"
+      />
+    </section>
+
+    <p id="stageLabel" class="stage-label" aria-live="polite"></p>
+    <div id="progressBar" class="progress-bar hidden" aria-hidden="true">
+      <div id="progressFill" class="progress-fill"></div>
+    </div>
+
+    <div id="errorBox" class="error-box hidden" role="alert"></div>
+
+    <section id="results" class="results hidden" aria-live="polite">
+      <div class="file-name" id="fileNameLabel"></div>
+      <div class="verdict">
+        <span id="verdictLabel" class="verdict-label" data-label="live"></span>
+        <span id="verdictDetail" class="verdict-detail"></span>
+      </div>
+      <div id="windowInfo" class="window-info"></div>
+      <div id="windowsContainer" class="windows"></div>
+    </section>
+
+    <section class="methodology">
+      <details>
+        <summary>How this works</summary>
+        <p>
+          When you drop an audio file, your browser:
+        </p>
+        <ol>
+          <li>Decodes it locally (the browser handles MP3/WAV/FLAC/M4A).</li>
+          <li>Resamples to 16 kHz mono and pulls out three 30-second windows.</li>
+          <li>Runs each window through the
+            <a href="https://huggingface.co/MIT/ast-finetuned-audioset-10-10-0.4593"
+               target="_blank" rel="noopener noreferrer">Audio Spectrogram Transformer</a>
+            — an 86-million-parameter model pretrained on AudioSet — to produce a
+            768-dimensional embedding per window.</li>
+          <li>Feeds that embedding into a tiny linear classifier (1,538 parameters)
+            trained on 24,000 audio clips to distinguish live from studio.</li>
+          <li>Takes the majority vote across the three windows.</li>
+        </ol>
+        <p>
+          Both models run in your browser via
+          <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>
+          (which wraps <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener noreferrer">ONNX Runtime Web</a>) — WebGPU when available, WebAssembly otherwise.
+          The model downloads once (~87 MB), then the browser caches it.
+          <strong>Your audio never leaves your device.</strong>
+        </p>
+      </details>
+
+      <details>
+        <summary>How accurate is it?</summary>
+        <p>
+          On a held-out test set drawn from the same distribution as training data, the classifier
+          scores about <strong>94.5%</strong> accuracy. On a separate adversarial test set of 150
+          shows tagged "soundboard," "audience," or "matrix" mix from the Internet Archive's Live
+          Music Archive — recordings deliberately chosen to be hard — it still scores
+          <strong>93.9%</strong>. The model generalizes well, but it's not perfect: it tends to
+          mis-classify quiet, lo-fi, or room-recorded studio tracks as live, and very clean
+          soundboard-style live recordings as studio.
+        </p>
+      </details>
+
+      <details>
+        <summary>What was it trained on?</summary>
+        <p>
+          24,227 30-second clips. Live data: ~10,000 clips drawn from the
+          <a href="https://archive.org/details/etree" target="_blank" rel="noopener noreferrer">Internet Archive's Live Music Archive</a>,
+          plus ~6,000 from a personal collection. Studio data: ~8,000 clips from the
+          <a href="https://github.com/mdeff/fma" target="_blank" rel="noopener noreferrer">Free Music Archive</a>
+          (small subset). Training used a frozen AST backbone and a single linear
+          layer trained with class-weighted cross-entropy.
+        </p>
+      </details>
+    </section>
+
+    <footer>
+      <p>
+        Built with <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>
+        ·
+        Source code on
+        <a href="https://github.com/ziipo/LiveAudioClassifier" target="_blank" rel="noopener noreferrer">GitHub</a>
+        ·
+        MIT licensed
+      </p>
+    </footer>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

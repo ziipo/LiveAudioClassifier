@@ -1,0 +1,42 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# Internal — training pipeline, planning docs, source-tagged datasets.
+# Kept locally for the project owner; not part of the public repo.
+_internal/
+
+# Data — audio files & precomputed tensors are large; never commit them
+data/
+*.mp3
+*.wav
+*.flac
+*.m4a
+*.ogg
+*.npy
+
+# Model checkpoints — large binaries
+models/
+*.safetensors
+*.bin
+*.ckpt
+*.pt
+*.pth
+
+# Experiment tracking
+wandb/
+*.log
+
+# Notebook checkpoints / empty folder
+notebooks/
+.ipynb_checkpoints/
+
+# Internal Claude / agent state
+.claude/
+
+# Web demo: future node_modules if we add a build step
+web/node_modules/
+
+# OS noise
+.DS_Store

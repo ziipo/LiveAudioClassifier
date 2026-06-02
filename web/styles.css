@@ -1,0 +1,270 @@
+/* styles.css — single-file CSS for the live-vs-studio demo.
+ * No framework. System fonts. Designed to be readable, calm, and accessible:
+ *   - WCAG AA contrast throughout
+ *   - keyboard-navigable dropzone
+ *   - works without JS up through "drop a file" (JS handles the rest)
+ *   - respects prefers-color-scheme for dark/light
+ */
+
+:root {
+  --bg: #fafaf7;
+  --fg: #1a1a1a;
+  --fg-dim: #555;
+  --accent: #2563eb;      /* default brand */
+  --accent-dim: #dbeafe;
+  --live: #2563eb;        /* blue — calmer than red/green */
+  --studio: #d97706;      /* amber — neutral pair to blue */
+  --border: #d4d4d4;
+  --border-strong: #888;
+  --error: #b91c1c;
+  --error-bg: #fef2f2;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1a1a1a;
+    --fg: #f5f5f5;
+    --fg-dim: #aaa;
+    --accent-dim: #1e3a8a;
+    --border: #3a3a3a;
+    --border-strong: #666;
+    --error: #fca5a5;
+    --error-bg: #2c1717;
+    --shadow: 0 1px 3px rgba(0,0,0,.4), 0 4px 12px rgba(0,0,0,.3);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 4rem;
+}
+
+header h1 {
+  font-size: 2.2rem;
+  margin: 0 0 .5rem;
+  letter-spacing: -.02em;
+}
+
+header .tagline {
+  font-size: 1.05rem;
+  margin: 0 0 1rem;
+  color: var(--fg);
+}
+
+header .hint {
+  font-size: .85rem;
+  color: var(--fg-dim);
+  margin: 1rem 0 0;
+}
+
+em { font-style: normal; font-weight: 600; color: var(--accent); }
+
+/* --- Dropzone --- */
+#dropzone {
+  margin: 2rem 0 1rem;
+  padding: 3rem 1.5rem;
+  background: var(--bg);
+  border: 2px dashed var(--border-strong);
+  border-radius: 14px;
+  text-align: center;
+  cursor: pointer;
+  transition: background .15s, border-color .15s;
+  outline: none;
+}
+#dropzone:hover,
+#dropzone:focus-visible,
+#dropzone.drag-active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+}
+#dropzone:focus-visible {
+  box-shadow: 0 0 0 3px var(--accent-dim);
+}
+.dropzone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+}
+.dropzone-icon { font-size: 2.5rem; }
+.dropzone-text strong { display: block; font-size: 1.15rem; }
+.dropzone-text span { display: block; font-size: .9rem; color: var(--fg-dim); margin-top: .25rem; }
+
+/* --- Stage / progress --- */
+.stage-label {
+  text-align: center;
+  font-size: .9rem;
+  color: var(--fg-dim);
+  margin: .5rem 0 .25rem;
+  min-height: 1.2em;
+}
+.progress-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0 0 1rem;
+}
+.progress-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  transition: width .2s;
+}
+
+/* --- Error --- */
+.error-box {
+  background: var(--error-bg);
+  color: var(--error);
+  padding: .75rem 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--error);
+  font-size: .95rem;
+  margin: 1rem 0;
+}
+
+/* --- Results --- */
+.results {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+}
+.file-name {
+  font-size: .85rem;
+  color: var(--fg-dim);
+  margin-bottom: .5rem;
+  word-break: break-all;
+}
+.verdict {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: .5rem;
+}
+.verdict-label {
+  font-size: 2.5rem;
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+.verdict-label[data-label="live"]   { color: var(--live); }
+.verdict-label[data-label="studio"] { color: var(--studio); }
+.verdict-detail {
+  font-size: 1rem;
+  color: var(--fg-dim);
+}
+.window-info {
+  font-size: .85rem;
+  color: var(--fg-dim);
+  margin: 1rem 0 .75rem;
+}
+
+/* --- Per-window cards --- */
+.windows {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: .75rem;
+}
+.window-card {
+  padding: 1rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.window-title {
+  font-size: .75rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--fg-dim);
+}
+.window-label {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: .3rem 0 .5rem;
+}
+.window-live .window-label   { color: var(--live); }
+.window-studio .window-label { color: var(--studio); }
+.window-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: .35rem;
+}
+.window-bar-fill {
+  height: 100%;
+  background: var(--live);
+  transition: width .3s;
+}
+.window-studio .window-bar-fill {
+  background: var(--studio);
+}
+.window-prob {
+  font-size: .85rem;
+  color: var(--fg-dim);
+}
+
+/* --- Methodology --- */
+.methodology {
+  margin: 3rem 0 0;
+  padding: 0;
+}
+.methodology details {
+  border-top: 1px solid var(--border);
+  padding: 1rem 0;
+}
+.methodology summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--fg);
+  list-style-position: inside;
+}
+.methodology details[open] summary {
+  margin-bottom: .75rem;
+}
+.methodology p,
+.methodology ol {
+  font-size: .95rem;
+  color: var(--fg);
+  margin: .5rem 0;
+}
+.methodology a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/* --- Footer --- */
+footer {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+  font-size: .85rem;
+  color: var(--fg-dim);
+  text-align: center;
+}
+footer a {
+  color: var(--fg-dim);
+  text-decoration: underline;
+}
+
+/* --- Utility --- */
+.hidden { display: none !important; }
