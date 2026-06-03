@@ -22,8 +22,8 @@ The probe weights live at [`web/probe-weights.json`](web/probe-weights.json) (~4
 | Source | Clips | Label |
 |---|---|---|
 | Internet Archive Live Music Archive | 10,149 | live |
-| Personal collection | 6,084 | live |
 | Free Music Archive | 7,994 | studio |
+| Personal collection | 6,084 | live |
 | **Total** | **24,227** | 67% live / 33% studio |
 
 ## How well it does
@@ -37,38 +37,7 @@ The 0.5-pp drop on the harder test set is small — the model generalizes well. 
 
 Both tests use a held-out FMA studio split and various live sources.
 
-## Repository layout
-
-```
-web/                       # the browser demo (deployed to GitHub Pages)
-  index.html               # the page itself
-  app.js                   # orchestration: upload → audio → AST → probe → render
-  ast.js                   # transformers.js wrapper for AST inference
-  audio.js                 # decode → 16 kHz mono → 30-second windows
-  probe.js                 # JS implementation of the linear probe
-  probe-weights.json       # trained probe weights (~42 KB)
-  styles.css
-
-scripts/
-  predict.py               # local CLI: same model, same pipeline, command-line interface
-
-requirements.txt           # Python dependencies for the local CLI
-LICENSE                    # MIT
-```
-
-## Running the web demo locally
-
-The web demo is plain static files — no build step:
-
-```bash
-cd web
-python3 -m http.server 8000
-# open http://localhost:8000
-```
-
-The AST model (~87 MB) downloads from HuggingFace on first visit and is cached by the browser thereafter.
-
-## Running the local CLI
+## Running it locally
 
 If you'd rather classify a folder of audio without a browser — or work offline once the model is cached — there's a Python command-line version at `scripts/predict.py`.
 
