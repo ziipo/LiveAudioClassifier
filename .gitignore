@@ -38,5 +38,8 @@ notebooks/
 # Web demo: future node_modules if we add a build step
 web/node_modules/
 
+# ONNX build artifacts — only web/model.onnx is shipped, not the fp32 sidecar
+artifacts/
+
 # OS noise
 .DS_Store

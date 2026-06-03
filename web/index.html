@@ -79,10 +79,12 @@
           <li>Takes the majority vote across the three windows.</li>
         </ol>
         <p>
-          Both models run in your browser via
-          <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>
-          (which wraps <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener noreferrer">ONNX Runtime Web</a>) — WebGPU when available, WebAssembly otherwise.
-          The model downloads once (~87 MB), then the browser caches it.
+          The models run in your browser via
+          <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener noreferrer">ONNX Runtime Web</a>
+          for inference, plus <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>
+          for the mel-spectrogram preprocessing. Inference uses WebGPU when
+          available, WebAssembly otherwise. The AST model downloads once
+          (~85 MB), then the browser caches it.
           <strong>Your audio never leaves your device.</strong>
         </p>
       </details>

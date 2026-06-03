@@ -13,7 +13,7 @@ The classifier is a two-part model:
 1. **AST backbone** ([MIT/ast-finetuned-audioset-10-10-0.4593](https://huggingface.co/MIT/ast-finetuned-audioset-10-10-0.4593)) — 86 million parameters, pretrained on AudioSet to understand audio at a general level. Frozen during my training.
 2. **Linear probe** — 1,538 parameters. A single `nn.Linear(768, 2)` layer trained on the AST embeddings to make the live-vs-studio decision.
 
-The probe weights live at [`web/probe-weights.json`](web/probe-weights.json) (~42 KB). The AST backbone is downloaded once from HuggingFace's CDN (~87 MB, int8-quantized) and browser-cached. For each input clip, the pipeline takes three 30-second windows at 25/50/75% of the usable span, runs each through AST + the probe, and takes the majority vote.
+The probe weights live at [`web/probe-weights.json`](web/probe-weights.json) (~42 KB). The AST backbone is shipped as an int8-quantized ONNX file (~85 MB) served from the same GitHub Pages origin, downloaded once on first visit and browser-cached. For each input clip, the pipeline takes three 30-second windows at 25/50/75% of the usable span, runs each through AST + the probe, and takes the majority vote.
 
 ## What it was trained on
 
@@ -37,7 +37,7 @@ The 0.5-pp drop on the harder test set is small — the model generalizes well. 
 
 Both tests use a held-out FMA studio split and various live sources.
 
-## Running it locally
+## Running the local CLI
 
 If you'd rather classify a folder of audio without a browser — or work offline once the model is cached — there's a Python command-line version at `scripts/predict.py`.
 
@@ -73,7 +73,7 @@ song.mp3
 
 Your audio never leaves your device. The web demo's only network requests are:
 
-- One-time download of the AST backbone from HuggingFace's CDN (cached forever afterward)
+- One-time download of the AST backbone (~85 MB ONNX file from the same GitHub Pages origin, cached forever afterward)
 - One-time download of `transformers.js` and `onnxruntime-web` from jsDelivr
 - The static page assets from GitHub Pages
 
@@ -81,7 +81,7 @@ You can verify this in your browser's DevTools Network tab. There is no server, 
 
 ## Limitations
 
-- **First load is slow.** The AST backbone is 87 MB (browser) or ~350 MB (CLI). Both are cached after the first run.
+- **First load is slow.** The AST backbone is ~85 MB (browser) or ~350 MB (CLI). Both are cached after the first run.
 - **WebAssembly fallback is noticeably slower** than WebGPU. The page detects which is available and shows a hint. WebGPU works in recent Chrome/Edge/Safari; Firefox falls back to WASM.
 - **Short audio.** Anything under 5 seconds is rejected; 5-30s is padded to 30s and gets a single window; 60s+ gets the full three-window treatment.
 - **Studio recordings made to sound live** (reverb-heavy production, room mics, single-take sessions) can be misclassified as live. Very clean soundboard-style live recordings can occasionally go the other way.
