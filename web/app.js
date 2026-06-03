@@ -29,13 +29,10 @@ let astInstance = null;
 let probeInstance = null;
 
 async function init() {
-  // Detect WebGPU vs WASM up front so we can warn the user if WASM-only
-  // (inference will be ~10x slower).
-  detectAccelerator().then((kind) => {
-    els.acceleratorHint.textContent = kind === "webgpu"
-      ? "Browser accelerator: WebGPU (fast)"
-      : "Browser accelerator: WASM (slower — try Chrome or Edge for WebGPU)";
-  });
+  // We run AST on WASM (see ast.js for why WebGPU is disabled).
+  // ~1-2 s per 30-second window on a recent laptop; one file = ~3-6 s of inference.
+  els.acceleratorHint.textContent =
+    "Browser accelerator: WASM (CPU). Inference takes a few seconds per file.";
 
   // Probe loads instantly (~42 KB JSON). Show its metrics as soon as we have them.
   probeInstance = await Probe.load("probe-weights.json");
@@ -49,15 +46,17 @@ async function init() {
 }
 
 // --- Lazy AST load. Called on the first file the user picks. ------------------
-async function ensureAstLoaded() {
+// The onLoadProgress callback receives a fraction [0..1] of the *download* phase.
+async function ensureAstLoaded(onLoadProgress) {
   if (astInstance) return astInstance;
-  setStage("loading", 0, "Downloading AST model (~87 MB, one time)…");
   astInstance = await AST.load(({ stage, progress, file }) => {
     if (stage === "downloading" && progress != null) {
       const fileLabel = file ? ` (${file})` : "";
-      setStage("downloading", progress, `Downloading AST model${fileLabel}…`);
+      onLoadProgress(progress, `Downloading AST model${fileLabel}…`);
     } else if (stage === "ready") {
-      setStage("loading", 1, "Model loaded. Initializing…");
+      onLoadProgress(1, "Model loaded. Initializing…");
+    } else {
+      onLoadProgress(0, "Downloading AST model (~87 MB, one time)…");
     }
   });
   return astInstance;
@@ -95,31 +94,108 @@ function setupDropzone() {
 }
 
 // --- The pipeline ------------------------------------------------------------
+//
+// End-to-end progress design:
+//   We map each stage onto a sub-segment [start..end] of the OVERALL bar so the
+//   user sees one bar that fills monotonically from 0% -> 100% across the
+//   whole pipeline — not a bar that resets per task. The text label still
+//   tells them which stage is running (good context), but the bar tells them
+//   how far through the whole job they are.
+//
+//   Segment weights (rough, calibrated to wall-clock):
+//     - First-time run (model download dominates):
+//         decode 0.00..0.05  windows 0.05..0.07  download 0.07..0.55
+//         inference 0.55..1.00
+//     - Cached run (no download):
+//         decode 0.00..0.05  windows 0.05..0.07  inference 0.07..1.00
+//
+//   Inference itself is N windows; each window claims an equal slice of the
+//   inference segment. The fill bar also has a CSS shimmer overlay so even
+//   when a slice is mid-window (no movement for ~1.5 s) the bar still looks
+//   alive ("something is happening").
+function planSegments(modelAlreadyLoaded) {
+  if (modelAlreadyLoaded) {
+    return { decode: [0, 0.05], windowing: [0.05, 0.07], download: null, inference: [0.07, 1.0] };
+  }
+  return { decode: [0, 0.05], windowing: [0.05, 0.07], download: [0.07, 0.55], inference: [0.55, 1.0] };
+}
+
+function lerp([a, b], t) { return a + (b - a) * Math.max(0, Math.min(1, t)); }
+
 async function handleFile(file) {
   hideError();
   hideResults();
   els.fileNameLabel.textContent = file.name;
+  const seg = planSegments(astInstance !== null);
   try {
-    setStage("decoding", 0, "Decoding audio…");
+    setStage("decoding", lerp(seg.decode, 0), "Decoding audio…");
     const samples = await decodeTo16kMono(file);
     const durationSec = samples.length / 16000;
+    setStage("decoding", lerp(seg.decode, 1), "Decoding audio…");
 
-    setStage("windowing", 0, "Extracting 30-second windows…");
+    setStage("windowing", lerp(seg.windowing, 0), "Extracting 30-second windows…");
     const { windows, info } = extractWindows(samples);
     if (windows.length === 0) {
       throw new Error(info || "Audio is too short to classify (need at least 5 seconds).");
     }
+    setStage("windowing", lerp(seg.windowing, 1), "Extracting 30-second windows…");
 
-    const ast = await ensureAstLoaded();
-    setStage("inference", 0, "Running AST on each window…");
+    const ast = await ensureAstLoaded((p, label) => {
+      if (seg.download) setStage("downloading", lerp(seg.download, p), label);
+    });
+
+    // Inference loop.
+    //
+    // Each ast.embed() call blocks the main thread synchronously for ~1.5-2 s
+    // (WASM does not yield). The browser cannot paint during that block —
+    // not the bar, not a spinner, not even a CSS shimmer animation reliably.
+    // So we set expectations honestly:
+    //   * Label tells the user *up front* roughly how long this will take.
+    //   * Bar advances cleanly between windows (visible jumps after each).
+    //   * We yield to the browser BEFORE each WASM call with setTimeout so
+    //     the new state actually paints before the freeze.
+    // No fake animation that would look broken when it freezes.
+    const infSeg = seg.inference;
     const perWindow = [];
+    // estWindowMs starts unknown — we don't show an ETA on the first window
+    // because a bad guess up-front ("5s left") looks worse than no number when
+    // the actual answer turns out to be 30s. After window 1 we have real data.
+    let estWindowMs = null;
+
     for (let i = 0; i < windows.length; i++) {
-      setStage("inference", i / windows.length,
-               `Window ${i + 1} of ${windows.length}…`);
+      const remaining = windows.length - i;
+      const baseLabel = `Analyzing window ${i + 1} of ${windows.length}`;
+      const etaSuffix = estWindowMs
+        ? ` · about ${Math.max(1, Math.round((remaining * estWindowMs) / 1000))}s left…`
+        : "…";
+      setStage("inference", lerp(infSeg, i / windows.length),
+               baseLabel + etaSuffix);
+      // Macrotask yield so the label + bar actually paint before WASM blocks.
+      // rAF alone isn't enough: its callback runs BEFORE the next commit, but
+      // a synchronous WASM call on the next line would prevent the commit
+      // from happening, deferring the callback until after WASM finishes.
+      // setTimeout puts us in the macrotask queue AFTER the browser has had a
+      // chance to paint.
+      await new Promise(r => setTimeout(r, 32));
+
+      const winStart = performance.now();
       const emb = await ast.embed(windows[i]);
       const out = probeInstance.predict(emb);
+      if (new URLSearchParams(window.location.search).get("debug") === "1") {
+        console.log(`[DEBUG window ${i + 1} probe]`, {
+          logits: out.logits.map((v) => v.toFixed(4)),
+          p_studio: out.pStudio.toFixed(4),
+          p_live: out.pLive.toFixed(4),
+          label: out.label,
+        });
+      }
       perWindow.push(out);
+      // Calibrate from the actual first window so the ETA on subsequent
+      // windows matches the user's hardware.
+      const actual = performance.now() - winStart;
+      estWindowMs = i === 0 ? actual : 0.6 * estWindowMs + 0.4 * actual;
     }
+    setStage("inference", 1, "Finishing up…");
 
     setStage("done", 1, "Done.");
     renderResults({ file, durationSec, info, perWindow });

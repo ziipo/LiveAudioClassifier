@@ -82,20 +82,24 @@ export class AST {
       });
     });
 
-    // Try WebGPU first; fall back to wasm if it's not available or fails.
-    let session;
-    try {
-      session = await ort.InferenceSession.create(modelBytes, {
-        executionProviders: ["webgpu", "wasm"],
-        graphOptimizationLevel: "all",
-      });
-    } catch (e) {
-      console.warn("ONNX session create failed with WebGPU; falling back to WASM", e);
-      session = await ort.InferenceSession.create(modelBytes, {
-        executionProviders: ["wasm"],
-        graphOptimizationLevel: "all",
-      });
-    }
+    // IMPORTANT: WASM-only, no WebGPU.
+    //
+    // We previously preferred WebGPU and fell back to WASM. But for THIS
+    // int8-quantized backbone, the onnxruntime-web WebGPU EP silently
+    // produces incorrect numerical output — the 768-d pooler_output L2
+    // norm shrinks by ~17% (34.5 -> 28.6 on a known reference clip),
+    // which is enough to flip nearly every studio prediction to "live"
+    // with high confidence. Likely cause: a per-op MatMulInteger /
+    // DynamicQuantizeLinear path on WebGPU that disagrees with the
+    // CPU/WASM implementation. There is no error thrown — just bad numbers.
+    //
+    // WASM-only matches Python's onnxruntime to 4 decimal places on the
+    // same files. Inference is ~1-2 s per 30 s window instead of ~300 ms,
+    // which is fine for a single-click demo.
+    const session = await ort.InferenceSession.create(modelBytes, {
+      executionProviders: ["wasm"],
+      graphOptimizationLevel: "all",
+    });
 
     onProgress?.({ stage: "ready", progress: 1 });
     return new AST(featureExtractor, session);
@@ -114,6 +118,37 @@ export class AST {
       sampling_rate: 16000,
     });
     const input = features.input_values;
+
+    // [DEBUG] When ?debug=1 is in the URL, log stats so we can compare to
+    // Python's ASTFeatureExtractor output. On a 30s studio clip, Python
+    // produces mel mean≈0.47, std≈0.31, min≈-1.28, max≈1.26 (post-normalization
+    // with model-specific mean=-4.27, std=4.57). If the JS port produces
+    // raw log-mels (mean≈-4, std≈4) we've found the bug.
+    if (typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("debug") === "1") {
+      const d = input.data;
+      let s = 0, sq = 0, mn = Infinity, mx = -Infinity;
+      for (let i = 0; i < d.length; i++) {
+        const v = d[i]; s += v; sq += v * v;
+        if (v < mn) mn = v; if (v > mx) mx = v;
+      }
+      const mean = s / d.length;
+      const std = Math.sqrt(sq / d.length - mean * mean);
+      const sampMin = Math.min(...samples16k.slice(0, 100000));
+      const sampMax = Math.max(...samples16k.slice(0, 100000));
+      console.log("[DEBUG audio→mel]", {
+        samples_len: samples16k.length,
+        samples_first100k_min: sampMin.toFixed(4),
+        samples_first100k_max: sampMax.toFixed(4),
+        mel_dims: input.dims,
+        mel_mean: mean.toFixed(4),
+        mel_std: std.toFixed(4),
+        mel_min: mn.toFixed(4),
+        mel_max: mx.toFixed(4),
+        expected_mean_studio: "≈0.47 (normalized) — if you see ≈-4 the normalization is missing",
+      });
+    }
+
     // transformers.js returns its own Tensor; ORT wants ort.Tensor. The data
     // array is compatible (Float32Array).
     const ortInput = new ort.Tensor("float32", input.data, input.dims);
@@ -131,6 +166,22 @@ export class AST {
         `pooler_output length ${pooler.data.length} != 768`
       );
     }
+
+    if (typeof window !== "undefined" &&
+        new URLSearchParams(window.location.search).get("debug") === "1") {
+      const p = pooler.data;
+      let s = 0, sq = 0, l2 = 0;
+      for (let i = 0; i < p.length; i++) { s += p[i]; sq += p[i] * p[i]; l2 += p[i] * p[i]; }
+      const mean = s / p.length;
+      console.log("[DEBUG ONNX pooler_output]", {
+        len: p.length,
+        mean: mean.toFixed(4),
+        std: Math.sqrt(sq / p.length - mean * mean).toFixed(4),
+        L2: Math.sqrt(l2).toFixed(4),
+        expected_L2: "≈34.5 (Python ref on Tigerlily)",
+      });
+    }
+
     return Array.from(pooler.data);
   }
 }

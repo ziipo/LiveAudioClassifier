@@ -82,8 +82,9 @@
           The models run in your browser via
           <a href="https://onnxruntime.ai/docs/tutorials/web/" target="_blank" rel="noopener noreferrer">ONNX Runtime Web</a>
           for inference, plus <a href="https://huggingface.co/docs/transformers.js" target="_blank" rel="noopener noreferrer">transformers.js</a>
-          for the mel-spectrogram preprocessing. Inference uses WebGPU when
-          available, WebAssembly otherwise. The AST model downloads once
+          for the mel-spectrogram preprocessing. Inference uses WebAssembly
+          (the WebGPU backend silently mis-quantizes this model). The AST
+          model downloads once
           (~85 MB), then the browser caches it.
           <strong>Your audio never leaves your device.</strong>
         </p>

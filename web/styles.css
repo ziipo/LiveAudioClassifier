@@ -104,26 +104,62 @@ em { font-style: normal; font-weight: 600; color: var(--accent); }
 .dropzone-text strong { display: block; font-size: 1.15rem; }
 .dropzone-text span { display: block; font-size: .9rem; color: var(--fg-dim); margin-top: .25rem; }
 
-/* --- Stage / progress --- */
+/* --- Stage / progress ---
+ *
+ * The progress bar measures the WHOLE pipeline (decode -> windows ->
+ * [download] -> inference), not per task. Wall-clock-weighted segments are
+ * assigned in app.js:planSegments(). The visual goal is to feel alive even
+ * during a 1-2 s slice where the fill width isn't moving: the bar is tall
+ * (12 px) and a CSS shimmer slides across the filled portion continuously.
+ *
+ * We also bump the stage label size while the bar is visible so the user
+ * has something prominent to read.
+ */
 .stage-label {
   text-align: center;
-  font-size: .9rem;
-  color: var(--fg-dim);
-  margin: .5rem 0 .25rem;
-  min-height: 1.2em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--fg);
+  margin: 1.25rem 0 .6rem;
+  min-height: 1.4em;
+  letter-spacing: -.005em;
 }
 .progress-bar {
-  height: 6px;
+  position: relative;
+  height: 12px;
   background: var(--border);
-  border-radius: 3px;
+  border-radius: 6px;
   overflow: hidden;
-  margin: 0 0 1rem;
+  margin: 0 0 1.25rem;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.08);
 }
 .progress-fill {
   height: 100%;
   width: 0;
   background: var(--accent);
-  transition: width .2s;
+  border-radius: 6px;
+  transition: width .35s ease-out;
+}
+/* NO SHIMMER ANIMATION.
+ *
+ * We experimented with a CSS shimmer (background-position, then transform)
+ * to convey "still working" during the 1-2 s synchronous WASM inference
+ * calls. Both approaches froze: WASM blocks the main thread, which blocks
+ * style/layout/paint, and Chrome doesn't reliably keep transform animations
+ * running on the compositor for ::after pseudo-elements while the main
+ * thread is unresponsive. A frozen shimmer is worse than no shimmer — it
+ * actively signals "something is broken."
+ *
+ * Instead we give the user real information: the label includes a countdown
+ * estimate ("…about 4s left"), and the bar advances cleanly between windows.
+ * The honest answer to "is something happening" is: yes, but the math is
+ * intense and the browser pauses while it runs. */
+
+.stage-sub {
+  font-size: .85rem;
+  font-weight: 400;
+  color: var(--fg-dim);
+  margin-left: .4rem;
 }
 
 /* --- Error --- */
