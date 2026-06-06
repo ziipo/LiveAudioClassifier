@@ -2,7 +2,7 @@
 
 A neural network that listens to a piece of music and predicts whether the recording is **a live recording** or **not**. Try it in your browser, or download the classifier and run it locally.
 
-> 🎙️ **[Try the demo →](https://ziipo.github.io/LiveAudioClassifier/)** *(link will work after first deploy)*
+> 🎙️ **[Try the demo →](https://ziipo.github.io/LiveAudioClassifier/)** 
 
 My testing shows the classifier achieves about **94.5%** accuracy on a held-out test set and **93.9%** on an adversarial test set of deliberately-hard recordings (clean soundboard mixes from the Internet Archive's Live Music Archive). The web demo runs entirely client-side via [transformers.js](https://huggingface.co/docs/transformers.js) and [ONNX Runtime Web](https://onnxruntime.ai/docs/tutorials/web/) — your audio never leaves your device.
 
